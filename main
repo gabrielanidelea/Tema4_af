@@ -1,0 +1,450 @@
+#include<iostream>
+#include<fstream>
+#include<queue>
+#include<vector>
+#include<stack>
+#include <bits/stdc++.h>
+using namespace std;
+ifstream f("hamilton.in");
+ofstream g("hamilton.out");
+const int MAX=100005;
+const int INF=0x3f3f3f3f;
+class graf{
+private:
+    int n; //nr noduri //pt pb disjoint reprezinta nr de multimi
+    int m; // nr muchii // pt pb disjoint repr nr de operatii
+    vector <vector<pair<int, int>>> vector_costuri; //(pt apm)
+    int vvect_disjoint[MAX]; // pt disjoint
+    vector <vector<pair<int, int>>> vect_dijk;
+    vector<vector<pair<int, int>>>vect_costuri_bellman;
+    vector<int> graf_mf[1001]; // mf
+    bool vizi_mf[1001]; // mf
+    int capacitate[1001][1001], tati[1001]; // mf
+    int mat[1001][1001]; // roy-floyd
+    vector<int>v_darb[100001]; //darb
+    int di[100001], nod_d; //vect de dst pt darb + nod
+    int rezultat_euler[MAX]; //euler
+    vector<pair<int, int>> v_euler[MAX]; // euler
+    bool vizi_euler[MAX] = {0}; // euler
+    int k = 0; // contor eu
+    vector<pair<int,int>> v_h[20], vv_hamilt; // hamilt
+    int rasp_hamilt[20][(1<<20)]; //hamilt
+    int rez_hamilt = 0; //hamilt
+ 
+public:
+ 
+ 
+ 
+//--------------------Tema 3---------------------------------
+    //MaxFlow
+    void citire_mf();
+    bool bfs_mf();
+    void maxfl();
+    void fct_mf();
+ 
+ 
+    //Roy-Floyd
+    void citire_rf();
+    void fct_royf();
+ 
+    //Diametrul unui Arbore
+    void citire_darb();
+    void dfs_darb(int nod1, int nod2, int &dimax);
+    void fct_darb();
+ 
+ 
+    // ------------Tema 4 ------------
+    // Ciclu Euler
+    void citire_euler();
+    void fct_euler(int a);
+    void afis_euler();
+    bool verif_euler();
+ 
+    // Hamilt
+    void citire_hamilt();
+    void fct_hamilt();
+ 
+ 
+};
+//---------hamilt----------
+void graf:: citire_hamilt()
+{
+    f >> n >> m;
+    for(int i = 1; i <= m; i++)
+    {
+        int nod1, nod2, c;
+        f>>nod1>>nod2>>c;
+        v_h[nod1].push_back({nod2, c});
+        if(nod2 == 0)
+        {
+            vv_hamilt.push_back({nod1, c});
+        }
+    }
+    for(int i = 0; i < n; i++)
+    {
+        for(int j = 0; j < (1<<n); j++)
+        {
+            rasp_hamilt[i][j]=INF;
+        }
+    }
+}
+void graf:: fct_hamilt()
+{
+    int i, j;
+    rasp_hamilt[0][1]=0; // plecam din nodul 1
+    for(int st=1; st < (1<<n); st+=2) // pe imp
+        for(i=0; i < n; i++)
+            if(rasp_hamilt[i][st] != INF)
+                for(j=0; j < v_h[i].size();j++)
+                {
+                    int nod_adiacent = v_h[i][j].first;
+                    int c = v_h[i][j].second;
+                    if((st & (1<<nod_adiacent)) == 0) // daca bitul vecin nu a fost viz in lant
+                        rasp_hamilt[nod_adiacent][st + (1<<nod_adiacent)] = min(rasp_hamilt[nod_adiacent][st + (1<<nod_adiacent)], rasp_hamilt[i][st] + c); // ii dam val min
+ 
+                }
+    for(rez_hamilt=INF, i=0; i<vv_hamilt.size(); i++) //verificam exist unei muchii de la ult la 0
+    {
+        rez_hamilt = min(rez_hamilt, rasp_hamilt[vv_hamilt[i].first][(1<<n) - 1] + vv_hamilt[i].second);
+    }
+    if(rez_hamilt == INF)
+    {
+        g << "Nu exista solutie";
+    }
+    else
+    {
+        g << rez_hamilt;
+    }
+}
+//---------hamilt---------
+//---------euler------------
+void graf :: citire_euler()
+{
+    f >> n >> m;
+    int nod1, nod2;
+    for(int i = 1; i <= m; i++)
+    {
+ 
+        f >> nod1 >> nod2;
+        v_euler[nod1].push_back(make_pair(nod2, i));
+        v_euler[nod2].push_back(make_pair(nod1, i));
+    }
+}
+void graf :: fct_euler(int a)
+{
+    int p, q;
+    while(!v_euler[a].empty())
+    {
+        p = v_euler[a].back().first;
+        q = v_euler[a].back().second;
+ 
+        v_euler[a].pop_back();
+ 
+        if(!vizi_euler[q])
+        {
+            vizi_euler[q] = 1; // il marcam cu true pe vizi_euler in dreptul lui q
+            fct_euler(p); // apelam fct pt p
+        }
+    }
+    rezultat_euler[++k] = a;
+}
+bool graf:: verif_euler()
+{
+    for(int i = 1; i <= n; i++)
+    {
+        if(v_euler[i].size() % 2 != 0)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+void graf:: afis_euler()
+{
+    if(verif_euler())
+    {
+        g << "-1";
+    }
+    else
+    {
+        fct_euler(1);
+        for(int i = 1; i < k; i++)
+        {
+            g << rezultat_euler[i] << " ";
+        }
+    }
+}
+ 
+//-------------euler------------
+//----------darb---------
+void graf:: citire_darb()
+{
+    int nod1, nod2;
+    f >> n;
+    for(int i = 1; i < n; i++)
+    {
+        f >> nod1 >> nod2;
+        v_darb[nod1].push_back(nod2);
+        v_darb[nod2].push_back(nod1);
+    }
+}
+void graf:: dfs_darb(int nod1, int nod2, int &dimax)
+{
+    for(auto i: v_darb[nod1])
+    {
+        if(i == nod2) // daca nodul i este egal cu nodul 2
+            continue; //iesim din if
+        else
+        { //daca este diferit
+            di[i] = di[nod1] + 1; // adaugam in dreptul distantei nodului i distanta nodului1 + 1
+            if(di[i] > dimax) // daca distanta din e mai mare decat diametrul maxim
+            {
+                dimax = di[i];
+                nod_d = i; // nodul declarat global va primi val din i
+            }
+            dfs_darb(i, nod1, dimax); // apelam recurs dfs
+        }
+    }
+ 
+}
+void graf::fct_darb()
+{
+    int dimax = 0; // diam max e initial 0
+    dfs_darb(1, 1, dimax);
+    di[nod_d] = 0;
+    dimax = 0;
+    dfs_darb(nod_d, nod_d, dimax);
+    g << di[nod_d] + 1; // afisam dist afer nodului updatat global + 1
+}
+//---------darb----------
+//---------roy-floyd----------
+void graf:: citire_rf()
+{
+    f >> n;
+    for(int i = 1; i<=n; i++)
+        for(int j = 1; j<=n; j++)
+            f >> mat[i][j];
+ 
+}
+void graf:: fct_royf()
+{
+    for(int p = 1; p <= n; p++)
+    {
+        for(int i = 1; i<= n; i++)
+        {
+            for(int j = 1; j <= n; j++)
+            {
+                if(mat[i][p] && mat[p][j] &&(!mat[i][j] || mat[i][j] > mat[i][p] + mat[p][j]) && i!=j)
+                {
+                    mat[i][j] = mat[i][p] + mat[p][j];
+                }
+            }
+        }
+    }
+    for(int i = 1; i<= n; i++)
+    {
+        for(int j = 1; j<=n; j++)
+        {
+            g << mat[i][j] << " ";
+ 
+        }
+        g << "\n";
+    }
+}
+//---------roy-floyd--------------------
+//---------maxflow----------------------
+ 
+void graf:: citire_mf()
+{
+    f >> n >> m;
+    for(int i = 0; i < m; i++)
+    {
+        int nod1, nod2;
+        f >> nod1 >> nod2;
+        f >> capacitate[nod1][nod2];
+        graf_mf[nod1].push_back(nod2);
+        graf_mf[nod2].push_back(nod1);
+    }
+}
+bool graf:: bfs_mf()
+{
+    queue<int> coada_mf;
+    coada_mf.push(1); //adaug 1 in coada
+    vizi_mf[1] = true; //il marchez
+    while(!coada_mf.empty()) // cat timp coada este nevida
+    {
+        auto nod_curent = coada_mf.front(); // tinem in nod_curent prima var din coada
+        coada_mf.pop();
+        for(auto i: graf_mf[nod_curent])
+        {
+            if(vizi_mf[i]!=0) continue; // daca vizi_mf[i] este vizitat
+            if(capacitate[nod_curent][i] == 0) continue; // daca in matrix nju sunt unite
+            vizi_mf[i] = true; // marchez nodul vecin
+            tati[i] = nod_curent; // pun in vect de tati in dreptul n odului vecin, nodul curent
+            coada_mf.push(i); // adaug vecinul in coada
+ 
+        }
+    }
+    bool ok = vizi_mf[n]; // ok va fi dat de ultimul nod viz
+    return ok;
+}
+void graf:: maxfl()
+{
+    int mflx, nod_curent;
+    for(auto j: graf_mf[n]) //parc graful
+    {
+        if(!vizi_mf[j]) continue; // daca nodul j nu a fost viz
+        mflx = capacitate[j][n]; //tinem capacitatea aferenta lui j si n in mflx
+        nod_curent = j; // tinem in var nod_curent variabila j
+        while(tati[nod_curent]!=0) // cat timp tatal nodului curent are atribuita o valoare
+        {
+            mflx = min(mflx, capacitate[tati[nod_curent]][nod_curent]); //tinem in var mflx min dintre capacit si mflx actual
+            nod_curent = tati[nod_curent]; // punem in nodul curent tatal nodului curent
+        }
+        capacitate[j][n] = capacitate[j][n] - mflx;
+        capacitate[n][j] = capacitate[n][j] + mflx;
+        nod_curent = j; // ii redam nodului curent valoarea j
+        while(tati[nod_curent]!=0) //reluam while-ul
+        {
+            capacitate[tati[nod_curent]][nod_curent] = capacitate[tati[nod_curent]][nod_curent] - mflx;
+            capacitate[nod_curent][tati[nod_curent]] = capacitate[nod_curent][tati[nod_curent]] + mflx;
+            nod_curent = tati[nod_curent];
+ 
+        }
+    }
+}
+void graf:: fct_mf()
+{
+    int rezultat = 0;
+    while(bfs_mf()!=0)//cat timp se poate apela bfs_mf()
+    {
+        maxfl();
+        memset(vizi_mf, 0, (n+1)*sizeof(bool)); //setam vizi_mf si tati de fiecare data
+        memset(tati, 0, (n+1)*sizeof(int));
+    }
+    for(auto i: graf_mf[1]) rezultat = rezultat + capacitate[i][1];
+    g << rezultat << "\n";
+}
+ 
+//--------maxflow---------------
+ 
+graf Gr;
+int main()
+{
+    //BFS
+/*
+    int N, M, S;
+    f>>N>>M>>S;
+    Gr.creare_graf(N, M, S);
+    Gr.creare_adiacente(M);
+    Gr.bfs(S);
+    for(int i = 1; i<=N; i++)
+        g<< Gr.minime[i]<<" ";
+*/
+    //DFS
+    /*
+    int N, M;
+    f>>N>>M;
+    Gr.creare_graf_Dfs(N, M);
+    Gr.creare_adiacente_Dfs(M);
+    g<<Gr.comp_conexe(N);
+    return 0;
+*/
+ 
+    //CTC
+    /*
+    int N, M;
+    f>>N>>M;
+    Gr.creare_graf_ctc(N, M);
+    Gr.creare_adiacente_ctc(M);
+    Gr.fct_ctc(N);
+    */
+ 
+    //critical connections
+    /*
+    int N, M;
+    f>>N>>M;
+    Gr.criticalConnections(N, M);
+    */
+ 
+    //Componente Biconexe
+/*
+    int N, M;
+    f>>N>>M;
+    Gr.creare_graf_bic(N, M);
+    Gr.creare_adiacente_bic(M);
+    Gr.dfs_bic(1);
+    Gr.afisare_bic();
+*/
+ 
+    //Havel Hakimi
+    /*
+    vector<int>v;
+    int N;
+    int h;
+    f>>N;
+    for(int i=0; i<N; i++)
+        {
+            f>>h;
+            v.push_back(h);
+        }
+{1}
+    if(Gr.HavelOK(N, v)==1)
+        g<<"Da";
+    else
+        g<<"Nu";
+    */
+ 
+ 
+    //Sortare Topologica
+    /*
+    int N, M;
+    f>>N>>M;
+    Gr.creare_graf_st(N, M);
+    Gr.creare_adiacente_st(M);
+    Gr.sortare_topologica();
+    Gr.afisare_sortare_topo();
+    */
+ 
+ 
+ 
+    //APM
+    /*
+    Gr.citire_APM();
+	Gr.algoritm_APM();
+    */
+ 
+	//Disjoint
+	//Gr.algo_disjuncte();
+ 
+	//Dijkstra
+    //Gr.algo_dijk();
+ 
+    //Bellman_ford
+    //Gr.algo_bellman_ford();
+ 
+    //MaxFlow
+    //Gr.citire_mf();
+    //Gr.fct_mf();
+ 
+    //Roy-Floyd
+    //Gr.citire_rf();
+    //Gr.fct_royf();
+ 
+    //Darb
+    //Gr.citire_darb();
+    //Gr.fct_darb();
+ 
+    // Ciclu Euler
+    //Gr.citire_euler();
+    //Gr.afis_euler();
+ 
+    //Hamilt
+    Gr.citire_hamilt();
+    Gr.fct_hamilt();
+ 
+ 
+ 
+ 
+    return 0;
+}
